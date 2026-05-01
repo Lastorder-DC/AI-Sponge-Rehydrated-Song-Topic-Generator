@@ -192,9 +192,42 @@ function App() {
   }
 
   const setCurrentVideoTime = (id: string) => {
-    toast.info('This feature requires YouTube iframe integration', {
-      description: 'For now, please enter the time manually in mm:ss format'
-    })
+    const iframe = document.getElementById('youtube-player') as HTMLIFrameElement
+    if (!iframe || !iframe.contentWindow) {
+      toast.error('Video player not found', {
+        description: 'Please ensure a valid YouTube URL is entered'
+      })
+      return
+    }
+
+    iframe.contentWindow.postMessage('{"event":"command","func":"getCurrentTime","args":""}', '*')
+    
+    const messageHandler = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.youtube.com') return
+      
+      try {
+        const data = JSON.parse(event.data)
+        if (data.event === 'infoDelivery' && data.info && typeof data.info.currentTime === 'number') {
+          const currentTime = Math.floor(data.info.currentTime)
+          const formattedTime = formatSecondsToMMSS(currentTime)
+          updateCharacter(id, 'timestamp', formattedTime)
+          toast.success('Timestamp set!', {
+            description: `Set to ${formattedTime}`
+          })
+          window.removeEventListener('message', messageHandler)
+        }
+      } catch (e) {
+        toast.error('Failed to get video time', {
+          description: 'Please try again or enter manually'
+        })
+      }
+    }
+
+    window.addEventListener('message', messageHandler)
+    
+    setTimeout(() => {
+      window.removeEventListener('message', messageHandler)
+    }, 3000)
   }
 
   const generateCommand = (): string => {
@@ -262,7 +295,7 @@ function App() {
           <div className="flex items-center justify-center gap-3 mb-3">
             <MusicNote weight="fill" className="text-accent w-10 h-10" />
             <h1 className="text-4xl font-bold tracking-tight text-foreground">
-              AI Sponge Rehydrated Song Topic Generator
+              AI Sponge Rehydrated<br />Song Topic Generator
             </h1>
           </div>
           <p className="text-muted-foreground text-lg">
@@ -273,7 +306,7 @@ function App() {
         <Alert className="mb-6 border-accent/30 bg-accent/5">
           <Warning weight="fill" className="h-5 w-5 text-accent" />
           <AlertDescription className="text-sm">
-            <strong>Remember:</strong> Live streams not supported • Remove ?si= from URLs • Keep songs under 4 mins • Add timestamps for multiple characters
+            <strong>Remember:</strong> AI Covers/Official Audio Only • Voice Acting Policy • No Regular Songs • Remove ?si= from URLs • Keep songs under 4 mins • Add timestamps for multiple characters
           </AlertDescription>
         </Alert>
 
@@ -320,7 +353,7 @@ function App() {
             </Card>
           </motion.div>
 
-          {videoInfo && !urlError && (
+          {videoInfo && !urlError && extractVideoId(youtubeUrl) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -331,22 +364,17 @@ function App() {
                   <CardTitle className="text-base">Video Preview</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex gap-4 items-start">
-                    <img 
-                      src={videoInfo.thumbnailUrl} 
-                      alt="Video thumbnail" 
-                      className="w-32 h-24 object-cover rounded-md border border-border"
+                  <div className="aspect-video w-full rounded-md overflow-hidden border border-border">
+                    <iframe
+                      id="youtube-player"
+                      className="w-full h-full"
+                      src={`https://www.youtube.com/embed/${extractVideoId(youtubeUrl)}?enablejsapi=1`}
+                      title={videoInfo.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
                     />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm line-clamp-2 mb-1">{videoInfo.title}</p>
-                      {videoInfo.duration && (
-                        <Badge variant="secondary" className="text-xs">
-                          <Clock weight="fill" className="w-3 h-3 mr-1" />
-                          {videoInfo.duration}
-                        </Badge>
-                      )}
-                    </div>
                   </div>
+                  <p className="font-medium text-sm mt-3 line-clamp-2">{videoInfo.title}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -512,6 +540,18 @@ function App() {
                 <CardTitle className="text-lg">📝 Formatting Tips</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
+                <div className="flex gap-2">
+                  <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <p><strong>AI Covers/Official Audio Only:</strong> Your song topic MUST be an AI cover, or official audio (Sweet Victory, Ripped Pants) that a character sings in the show or movie.</p>
+                </div>
+                <div className="flex gap-2">
+                  <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <p><strong>Voice Acting Policy:</strong> Voice acted audio is allowed as long as it is from a voice actor or a similar sounding voice.</p>
+                </div>
+                <div className="flex gap-2">
+                  <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <p><strong>No Regular Songs:</strong> Song topics are NOT AI generated, therefore submitting regular songs will not work!</p>
+                </div>
                 <div className="flex gap-2">
                   <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <p><strong>Multiple Characters:</strong> Add seconds to the starting point of each character</p>
