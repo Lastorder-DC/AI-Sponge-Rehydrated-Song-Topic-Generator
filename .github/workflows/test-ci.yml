@@ -34,7 +34,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+          BASE_PATH: /
 
       - name: Upload Pages build artifact
         if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
