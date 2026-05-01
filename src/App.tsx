@@ -292,39 +292,46 @@ function App() {
       return
     }
 
-    const timeoutId = setTimeout(() => {
-      window.removeEventListener('message', messageHandler)
-      toast.error('Failed to get video time', {
-        description: 'Please try again or enter manually'
-      })
-    }, 3000)
+    let timeoutId: number | null = null
+    let messageHandler: ((event: MessageEvent) => void) | null = null
 
-    const messageHandler = (event: MessageEvent) => {
+    messageHandler = (event: MessageEvent) => {
       if (event.origin !== 'https://www.youtube.com') return
       
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
         
         if (data.event === 'infoDelivery' && data.info && typeof data.info.currentTime === 'number') {
-          clearTimeout(timeoutId)
+          if (timeoutId) clearTimeout(timeoutId)
           const currentTime = Math.floor(data.info.currentTime)
           const formattedTime = formatSecondsToMMSS(currentTime)
           updateCharacter(id, 'timestamp', formattedTime)
           toast.success('Timestamp set!', {
             description: `Set to ${formattedTime}`
           })
-          window.removeEventListener('message', messageHandler)
+          if (messageHandler) window.removeEventListener('message', messageHandler)
         }
       } catch (e) {
-        clearTimeout(timeoutId)
-        window.removeEventListener('message', messageHandler)
+        if (timeoutId) clearTimeout(timeoutId)
+        if (messageHandler) window.removeEventListener('message', messageHandler)
       }
     }
 
     window.addEventListener('message', messageHandler)
     
+    timeoutId = window.setTimeout(() => {
+      if (messageHandler) window.removeEventListener('message', messageHandler)
+      toast.error('Failed to get video time', {
+        description: 'Please try again or enter manually'
+      })
+    }, 3000)
+    
     iframeRef.current.contentWindow.postMessage(
-      '{"event":"command","func":"getCurrentTime","args":""}',
+      JSON.stringify({
+        event: 'command',
+        func: 'getCurrentTime',
+        args: ''
+      }),
       '*'
     )
   }
@@ -600,10 +607,10 @@ function App() {
                             transition={{ duration: 0.2 }}
                             className="flex gap-3 items-start"
                           >
-                            <Badge variant="outline" className="mt-2.5 min-w-8 justify-center">
+                            <Badge variant="outline" className="mt-8 min-w-8 justify-center">
                               {index + 1}
                             </Badge>
-                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="flex-1 space-y-3">
                               <div>
                                 <Label htmlFor={`character-${char.id}`} className="text-xs mb-1.5 block">
                                   Character
@@ -658,7 +665,7 @@ function App() {
                               variant="ghost"
                               size="icon"
                               onClick={() => removeCharacter(char.id)}
-                              className="mt-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              className="mt-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
                               <Trash weight="bold" />
                             </Button>
