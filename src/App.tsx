@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -53,6 +54,7 @@ function App() {
   const [urlError, setUrlError] = useState('')
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null)
   const [isLoadingVideo, setIsLoadingVideo] = useState(false)
+  const [commandType, setCommandType] = useState<'topic' | 'supertopic'>('topic')
 
   const extractVideoId = (url: string): string | null => {
     if (!url) return null
@@ -247,7 +249,7 @@ function App() {
 
     if (!characterParts) return ''
 
-    return `!topic ${characterParts} sings ${cleanedUrl}`
+    return `!${commandType} ${characterParts} sings ${cleanedUrl}`
   }
 
   const command = generateCommand()
@@ -349,6 +351,36 @@ function App() {
                     </p>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.12 }}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MusicNote weight="bold" className="text-primary" />
+                  Command Type
+                </CardTitle>
+                <CardDescription>
+                  Choose between !topic or !supertopic command
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup value={commandType} onValueChange={(value) => setCommandType(value as 'topic' | 'supertopic')}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="topic" id="topic" />
+                    <Label htmlFor="topic" className="font-normal cursor-pointer">!topic</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="supertopic" id="supertopic" />
+                    <Label htmlFor="supertopic" className="font-normal cursor-pointer">!supertopic</Label>
+                  </div>
+                </RadioGroup>
               </CardContent>
             </Card>
           </motion.div>
@@ -554,7 +586,7 @@ function App() {
                 </div>
                 <div className="flex gap-2">
                   <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p><strong>Banned Songs List:</strong> Please refer to the <a href="https://docs.google.com/document/d/1vFOASAIL35UE5ilT4Ec2Tk0G3WpiNC631CFeSmSADJI/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">pinned messages</a> for a list of songs that are not permitted.</p>
+                  <p><strong>Banned Songs List:</strong> Please refer to <a href="https://docs.google.com/document/d/1vFOASAIL35UE5ilT4Ec2Tk0G3WpiNC631CFeSmSADJI/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">this link</a> for a list of songs that are not permitted.</p>
                 </div>
                 <div className="flex gap-2">
                   <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
