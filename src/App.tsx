@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { toast } from 'sonner'
+import { Toaster } from '@/components/ui/sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const CHARACTERS = [
@@ -283,9 +284,11 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/10 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,200,220,0.1),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent,transparent_50px,rgba(120,200,220,0.03)_50px,rgba(120,200,220,0.03)_51px)]" />
+    <>
+      <Toaster />
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/10 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,200,220,0.1),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent,transparent_50px,rgba(120,200,220,0.03)_50px,rgba(120,200,220,0.03)_51px)]" />
       
       <div className="relative z-10 container mx-auto px-4 py-8 max-w-4xl">
         <motion.div
@@ -650,6 +653,7 @@ function App() {
         </motion.footer>
       </div>
     </div>
+    </>
   )
 }
 
