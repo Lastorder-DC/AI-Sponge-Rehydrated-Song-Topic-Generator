@@ -1,18 +1,19 @@
-import { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
+import { Alert, AlertTitl
+
 import { Button } from "./components/ui/button";
 
 import { AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
 
-export const ErrorFallback = ({ error, resetErrorBoundary }) => {
+export const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => {
   // When encountering an error in the development mode, rethrow it and don't display the boundary.
-  // The parent UI will take care of showing a more helpful dialog.
-  if (import.meta.env.DEV) throw error;
+          <AlertDescription>
+          </AlertDescription>
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <Alert variant="destructive" className="mb-6">
-          <AlertTriangleIcon />
+          
+            {error.message}
+        </div>
+        <Button 
+          className="w-full"
           <AlertTitle>This spark has encountered a runtime error</AlertTitle>
           <AlertDescription>
             Something unexpected happened while running the application. The error details are shown below. Contact the spark author and let them know about this issue.
@@ -29,12 +30,12 @@ export const ErrorFallback = ({ error, resetErrorBoundary }) => {
         <Button 
           onClick={resetErrorBoundary} 
           className="w-full"
-          variant="outline"
-        >
-          <RefreshCwIcon />
-          Try Again
-        </Button>
-      </div>
-    </div>
-  );
-}
+
+
+
+
+
+
+
+
+
