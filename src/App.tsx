@@ -618,7 +618,7 @@ function App() {
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="none" id="stage-none" />
-                    <Label htmlFor="stage-none" className="font-normal cursor-pointer">None (default)</Label>
+                    <Label htmlFor="stage-none" className="font-normal cursor-pointer">Random (default)</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="0" id="stage-0" />
