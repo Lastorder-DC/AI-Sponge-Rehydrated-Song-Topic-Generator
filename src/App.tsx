@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Plus, Copy, Trash, Link, MusicNote, CheckCircle, Warning, Keyboard } from '@phosphor-icons/react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Plus, Copy, Trash, Link, MusicNote, CheckCircle, Warning, Keyboard, DotsSixVertical } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -51,44 +51,50 @@ interface VideoInfo {
   durationSeconds?: number
 }
 
+const CHARACTER_COLORS = [
+  'bg-blue-500',
+  'bg-purple-500',
+  'bg-green-500',
+  'bg-orange-500',
+  'bg-pink-500',
+  'bg-cyan-500',
+  'bg-yellow-500',
+  'bg-red-500',
+]
+
+const getCharacterColor = (character: string): string => {
+  const characterIndex = CHARACTERS.indexOf(character)
+  const colorIndex = Math.max(0, characterIndex) % CHARACTER_COLORS.length
+  return CHARACTER_COLORS[colorIndex]
+}
+
+const createCharacterId = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 function App() {
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [characters, setCharacters] = useState<CharacterEntry[]>([])
   const [urlError, setUrlError] = useState('')
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null)
-  const [isLoadingVideo, setIsLoadingVideo] = useState(false)
   const [commandType, setCommandType] = useState<'topic' | 'supertopic'>('topic')
   const [showShortcutsModal, setShowShortcutsModal] = useState(false)
+  const [draggedCharacterId, setDraggedCharacterId] = useState<string | null>(null)
+  const [editingTimestampCharacterId, setEditingTimestampCharacterId] = useState<string | null>(null)
+  const [editingTimestampValue, setEditingTimestampValue] = useState('')
+  const [editingTimestampError, setEditingTimestampError] = useState('')
 
-  useEffect(() => {
-    const handleKeyboard = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault()
-        setShowShortcutsModal(true)
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.shiftKey) {
-        e.preventDefault()
-        if (isValidCommand()) {
-          copyToClipboard()
-        }
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-        e.preventDefault()
-        addCharacter()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyboard)
-    return () => window.removeEventListener('keydown', handleKeyboard)
-  }, [youtubeUrl, characters, commandType])
-
-  const extractVideoId = (url: string): string | null => {
+  const extractVideoId = useCallback((url: string): string | null => {
     if (!url) return null
     
     const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?\/\s]+)/,
-      /youtube\.com\/embed\/([^&?\/\s]+)/,
-      /youtube\.com\/v\/([^&?\/\s]+)/
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?\s]+)/,
+      /youtube\.com\/embed\/([^&?\s]+)/,
+      /youtube\.com\/v\/([^&?\s]+)/
     ]
     
     for (const pattern of patterns) {
@@ -98,18 +104,18 @@ function App() {
       }
     }
     return null
-  }
+  }, [])
 
-  const cleanYoutubeUrl = (url: string): string => {
+  const cleanYoutubeUrl = useCallback((url: string): string => {
     if (!url) return ''
     const siIndex = url.indexOf('?si=')
     if (siIndex > -1) {
       return url.substring(0, siIndex)
     }
     return url
-  }
+  }, [])
 
-  const validateYoutubeUrl = (url: string): boolean => {
+  const validateYoutubeUrl = useCallback((url: string): boolean => {
     if (!url) {
       setUrlError('')
       return false
@@ -127,13 +133,12 @@ function App() {
       setUrlError('')
     }
     return isValid
-  }
+  }, [])
 
-  const fetchVideoInfo = async (url: string) => {
+  const fetchVideoInfo = useCallback(async (url: string) => {
     const videoId = extractVideoId(url)
     if (!videoId) return
 
-    setIsLoadingVideo(true)
     try {
       const response = await fetch(
         `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
@@ -155,19 +160,17 @@ function App() {
           durationSeconds: undefined
         })
       }
-    } catch (error) {
+    } catch {
       setVideoInfo({
         thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
         duration: '',
         title: 'YouTube Video',
         durationSeconds: undefined
       })
-    } finally {
-      setIsLoadingVideo(false)
     }
-  }
+  }, [extractVideoId])
 
-  const handleUrlChange = (value: string) => {
+  const handleUrlChange = useCallback((value: string) => {
     setYoutubeUrl(value)
     const isValid = validateYoutubeUrl(value)
     
@@ -176,9 +179,9 @@ function App() {
     } else {
       setVideoInfo(null)
     }
-  }
+  }, [fetchVideoInfo, validateYoutubeUrl])
 
-  const validateTimestamp = (timeStr: string): { valid: boolean; error?: string } => {
+  const validateTimestamp = useCallback((timeStr: string): { valid: boolean; error?: string } => {
     if (!timeStr || timeStr === '') return { valid: true }
     
     const parts = timeStr.split(':')
@@ -206,9 +209,9 @@ function App() {
     }
     
     return { valid: true }
-  }
+  }, [])
 
-  const convertToSeconds = (timeStr: string): number => {
+  const convertToSeconds = useCallback((timeStr: string): number => {
     if (!timeStr) return 0
     
     const parts = timeStr.split(':')
@@ -220,39 +223,108 @@ function App() {
       return minutes * 60 + seconds
     }
     return 0
-  }
+  }, [])
 
-  const formatSecondsToMMSS = (seconds: number): string => {
+  const formatSecondsToMMSS = useCallback((seconds: number): string => {
     if (!seconds || seconds === 0) return ''
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
+  }, [])
 
-  const addCharacter = () => {
-    setCharacters([
-      ...characters,
+  const timelineCharacters = useMemo(
+    () => characters.filter((char) => char.character && char.timestamp),
+    [characters],
+  )
+
+  const maxTimelineDuration = useMemo(
+    () => Math.max(240, ...timelineCharacters.map((char) => convertToSeconds(char.timestamp))),
+    [convertToSeconds, timelineCharacters],
+  )
+
+  const videoId = useMemo(() => extractVideoId(youtubeUrl), [extractVideoId, youtubeUrl])
+
+  const cleanedYoutubeUrl = useMemo(() => cleanYoutubeUrl(youtubeUrl), [cleanYoutubeUrl, youtubeUrl])
+
+  const editingTimestampCharacter = useMemo(
+    () => characters.find((char) => char.id === editingTimestampCharacterId),
+    [characters, editingTimestampCharacterId],
+  )
+
+  const addCharacter = useCallback(() => {
+    setCharacters((currentCharacters) => [
+      ...currentCharacters,
       {
-        id: Date.now().toString(),
+        id: createCharacterId(),
         character: '',
         timestamp: '',
       },
     ])
-  }
+  }, [])
 
-  const updateCharacter = (id: string, field: 'character' | 'timestamp', value: string) => {
-    setCharacters(
-      characters.map((char) =>
+  const updateCharacter = useCallback((id: string, field: 'character' | 'timestamp', value: string) => {
+    setCharacters((currentCharacters) =>
+      currentCharacters.map((char) =>
         char.id === id ? { ...char, [field]: value } : char
       )
     )
-  }
+  }, [])
 
-  const removeCharacter = (id: string) => {
-    setCharacters(characters.filter((char) => char.id !== id))
-  }
+  const removeCharacter = useCallback((id: string) => {
+    setCharacters((currentCharacters) => currentCharacters.filter((char) => char.id !== id))
+  }, [])
 
-  const generateCommand = (): string => {
+  const reorderCharacters = useCallback((sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return
+
+    setCharacters((currentCharacters) => {
+      const sourceIndex = currentCharacters.findIndex((char) => char.id === sourceId)
+      const targetIndex = currentCharacters.findIndex((char) => char.id === targetId)
+
+      if (sourceIndex === -1 || targetIndex === -1) {
+        return currentCharacters
+      }
+
+      const reorderedCharacters = [...currentCharacters]
+      const [movedCharacter] = reorderedCharacters.splice(sourceIndex, 1)
+      reorderedCharacters.splice(targetIndex, 0, movedCharacter)
+      return reorderedCharacters
+    })
+  }, [])
+
+  const openTimestampEditor = useCallback((char: CharacterEntry) => {
+    setEditingTimestampCharacterId(char.id)
+    setEditingTimestampValue(char.timestamp)
+    setEditingTimestampError('')
+  }, [])
+
+  const closeTimestampEditor = useCallback(() => {
+    setEditingTimestampCharacterId(null)
+    setEditingTimestampValue('')
+    setEditingTimestampError('')
+  }, [])
+
+  const saveTimestampEdit = useCallback(() => {
+    if (!editingTimestampCharacterId) return
+
+    const trimmedTimestamp = editingTimestampValue.trim()
+    const validation = validateTimestamp(trimmedTimestamp)
+    if (!validation.valid) {
+      setEditingTimestampError(validation.error || 'Invalid timestamp')
+      return
+    }
+
+    updateCharacter(editingTimestampCharacterId, 'timestamp', trimmedTimestamp)
+    closeTimestampEditor()
+  }, [
+    closeTimestampEditor,
+    editingTimestampCharacterId,
+    editingTimestampValue,
+    updateCharacter,
+    validateTimestamp,
+  ])
+
+  const generateCommand = useCallback((): string => {
     const cleanedUrl = cleanYoutubeUrl(youtubeUrl)
     if (!cleanedUrl || characters.length === 0) return ''
 
@@ -274,11 +346,11 @@ function App() {
     if (!characterParts) return ''
 
     return `!${commandType} ${characterParts} sings ${cleanedUrl}`
-  }
+  }, [characters, cleanYoutubeUrl, commandType, convertToSeconds, youtubeUrl])
 
-  const command = generateCommand()
+  const command = useMemo(() => generateCommand(), [generateCommand])
 
-  const isValidCommand = (): boolean => {
+  const isValidCommand = useCallback((): boolean => {
     if (!youtubeUrl || urlError) return false
     if (characters.length === 0) return false
     if (!characters.every((char) => char.character)) return false
@@ -291,9 +363,9 @@ function App() {
     }
 
     return true
-  }
+  }, [characters, urlError, validateTimestamp, youtubeUrl])
 
-  const copyToClipboard = async () => {
+  const copyToClipboard = useCallback(async () => {
     if (!isValidCommand()) return
 
     try {
@@ -301,10 +373,32 @@ function App() {
       toast.success('Command copied to clipboard!', {
         description: 'Ready to paste in Discord',
       })
-    } catch (err) {
+    } catch {
       toast.error('Failed to copy to clipboard')
     }
-  }
+  }, [command, isValidCommand])
+
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowShortcutsModal(true)
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.shiftKey) {
+        e.preventDefault()
+        if (isValidCommand()) {
+          copyToClipboard()
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        addCharacter()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyboard)
+    return () => window.removeEventListener('keydown', handleKeyboard)
+  }, [addCharacter, copyToClipboard, isValidCommand])
 
   return (
     <>
@@ -334,6 +428,58 @@ function App() {
               <Badge variant="outline" className="font-mono">Ctrl + N</Badge>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(editingTimestampCharacterId)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            closeTimestampEditor()
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Timestamp</DialogTitle>
+            <DialogDescription>
+              Update the start time for {editingTimestampCharacter?.character || 'this character'}.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              saveTimestampEdit()
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="timeline-timestamp">Start Time (mm:ss or seconds)</Label>
+              <Input
+                id="timeline-timestamp"
+                value={editingTimestampValue}
+                onChange={(event) => {
+                  setEditingTimestampValue(event.target.value)
+                  setEditingTimestampError('')
+                }}
+                placeholder="e.g., 1:30"
+                aria-invalid={Boolean(editingTimestampError)}
+                aria-describedby={editingTimestampError ? 'timeline-timestamp-error' : undefined}
+              />
+              {editingTimestampError && (
+                <p id="timeline-timestamp-error" className="text-sm text-destructive">
+                  {editingTimestampError}
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={closeTimestampEditor}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Save
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -407,10 +553,10 @@ function App() {
                       {urlError}
                     </p>
                   )}
-                  {youtubeUrl && !urlError && cleanYoutubeUrl(youtubeUrl) !== youtubeUrl && (
+                  {youtubeUrl && !urlError && cleanedYoutubeUrl !== youtubeUrl && (
                     <p className="text-sm text-muted-foreground flex items-center gap-1">
                       <CheckCircle weight="fill" className="w-4 h-4 text-green-600" />
-                      URL cleaned: {cleanYoutubeUrl(youtubeUrl)}
+                      URL cleaned: {cleanedYoutubeUrl}
                     </p>
                   )}
                 </div>
@@ -448,7 +594,7 @@ function App() {
             </Card>
           </motion.div>
 
-          {videoInfo && !urlError && extractVideoId(youtubeUrl) && (
+          {videoInfo && !urlError && videoId && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -464,7 +610,7 @@ function App() {
                 <CardContent>
                   <div className="aspect-video w-full rounded-md overflow-hidden border border-border">
                     <iframe
-                      src={`https://www.youtube.com/embed/${extractVideoId(youtubeUrl)}`}
+                      src={`https://www.youtube.com/embed/${videoId}`}
                       title={videoInfo.title}
                       className="w-full h-full"
                       allowFullScreen
@@ -472,42 +618,27 @@ function App() {
                     />
                   </div>
                   
-                  {characters.length > 0 && characters.some(c => c.character && c.timestamp) && (
+                  {timelineCharacters.length > 0 && (
                     <div className="mt-6 space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-sm font-semibold">Character Timeline</Label>
                         <span className="text-xs text-muted-foreground">Visual preview of when each character appears</span>
                       </div>
+                      <p id="timeline-drag-instructions" className="sr-only">
+                        Timeline markers can be clicked to edit timestamps and dragged onto another marker to reorder characters.
+                      </p>
                       <div className="relative bg-muted/30 rounded-lg p-4 border border-border">
                         <div className="relative h-16 bg-background/50 rounded border border-border overflow-hidden">
                           <div className="absolute inset-0 flex items-center">
                             <div className="w-full h-1 bg-muted" />
                           </div>
                           
-                          {characters
-                            .filter(c => c.character && c.timestamp)
+                          {timelineCharacters
                             .map((char) => {
                               const seconds = convertToSeconds(char.timestamp)
-                              const maxDuration = Math.max(
-                                240,
-                                ...characters
-                                  .filter(c => c.timestamp)
-                                  .map(c => convertToSeconds(c.timestamp))
-                              )
-                              const position = (seconds / maxDuration) * 100
-                              
-                              const colors = [
-                                'bg-blue-500',
-                                'bg-purple-500',
-                                'bg-green-500',
-                                'bg-orange-500',
-                                'bg-pink-500',
-                                'bg-cyan-500',
-                                'bg-yellow-500',
-                                'bg-red-500',
-                              ]
-                              const colorIndex = CHARACTERS.indexOf(char.character) % colors.length
-                              
+                              const position = (seconds / maxTimelineDuration) * 100
+                              const color = getCharacterColor(char.character)
+                               
                               return (
                                 <motion.div
                                   key={char.id}
@@ -516,8 +647,26 @@ function App() {
                                   exit={{ scale: 0 }}
                                   className="absolute top-1/2 -translate-y-1/2 group"
                                   style={{ left: `${position}%` }}
+                                  draggable
+                                  onDragStart={() => setDraggedCharacterId(char.id)}
+                                  onDragOver={(event) => event.preventDefault()}
+                                  onDrop={(event) => {
+                                    event.preventDefault()
+                                    if (draggedCharacterId) {
+                                      reorderCharacters(draggedCharacterId, char.id)
+                                    }
+                                    setDraggedCharacterId(null)
+                                  }}
+                                  onDragEnd={() => setDraggedCharacterId(null)}
                                 >
-                                  <div className={`w-3 h-3 rounded-full ${colors[colorIndex]} border-2 border-background shadow-lg -translate-x-1/2 cursor-pointer transition-transform hover:scale-150`} />
+                                  <button
+                                    type="button"
+                                    aria-label={`Edit ${char.character} timestamp`}
+                                    aria-describedby="timeline-drag-instructions"
+                                    title="Click to edit timestamp. Drag onto another marker to reorder."
+                                    onClick={() => openTimestampEditor(char)}
+                                    className={`w-4 h-4 rounded-full ${color} border-2 border-background shadow-lg -translate-x-1/2 cursor-grab active:cursor-grabbing transition-transform hover:scale-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background`}
+                                  />
                                   <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                                     <div className="bg-popover text-popover-foreground px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg border border-border">
                                       <div className="font-semibold">{char.character}</div>
@@ -532,14 +681,7 @@ function App() {
                         <div className="flex justify-between mt-2 text-xs text-muted-foreground">
                           <span>0:00</span>
                           <span>
-                            {formatSecondsToMMSS(
-                              Math.max(
-                                240,
-                                ...characters
-                                  .filter(c => c.timestamp)
-                                  .map(c => convertToSeconds(c.timestamp))
-                              )
-                            )}
+                            {formatSecondsToMMSS(maxTimelineDuration)}
                           </span>
                         </div>
                       </div>
@@ -547,22 +689,12 @@ function App() {
                       <div className="flex flex-wrap gap-2">
                         {characters
                           .filter(c => c.character)
-                          .map((char, index) => {
-                            const colors = [
-                              'bg-blue-500',
-                              'bg-purple-500',
-                              'bg-green-500',
-                              'bg-orange-500',
-                              'bg-pink-500',
-                              'bg-cyan-500',
-                              'bg-yellow-500',
-                              'bg-red-500',
-                            ]
-                            const colorIndex = CHARACTERS.indexOf(char.character) % colors.length
-                            
+                          .map((char) => {
+                            const color = getCharacterColor(char.character)
+                             
                             return (
                               <div key={char.id} className="flex items-center gap-2 text-xs">
-                                <div className={`w-2 h-2 rounded-full ${colors[colorIndex]}`} />
+                                <div className={`w-2 h-2 rounded-full ${color}`} />
                                 <span className="text-foreground font-medium">{char.character}</span>
                                 {char.timestamp && (
                                   <span className="text-muted-foreground">
@@ -626,7 +758,26 @@ function App() {
                             exit={{ opacity: 0, x: -20 }}
                             transition={{ duration: 0.2 }}
                             className="flex gap-3 items-start"
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => {
+                              event.preventDefault()
+                              if (draggedCharacterId) {
+                                reorderCharacters(draggedCharacterId, char.id)
+                              }
+                              setDraggedCharacterId(null)
+                            }}
+                            onDragEnd={() => setDraggedCharacterId(null)}
                           >
+                            <button
+                              type="button"
+                              draggable
+                              aria-label={`Drag ${char.character || `character ${index + 1}`} to reorder`}
+                              title="Drag to reorder"
+                              onDragStart={() => setDraggedCharacterId(char.id)}
+                              className="mt-2 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+                            >
+                              <DotsSixVertical weight="bold" className="w-5 h-5" />
+                            </button>
                             <Badge variant="outline" className="mt-2 min-w-8 justify-center">
                               {index + 1}
                             </Badge>
