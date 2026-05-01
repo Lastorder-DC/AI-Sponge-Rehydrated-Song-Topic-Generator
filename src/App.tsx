@@ -471,6 +471,110 @@ function App() {
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     />
                   </div>
+                  
+                  {characters.length > 0 && characters.some(c => c.character && c.timestamp) && (
+                    <div className="mt-6 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">Character Timeline</Label>
+                        <span className="text-xs text-muted-foreground">Visual preview of when each character appears</span>
+                      </div>
+                      <div className="relative bg-muted/30 rounded-lg p-4 border border-border">
+                        <div className="relative h-16 bg-background/50 rounded border border-border overflow-hidden">
+                          <div className="absolute inset-0 flex items-center">
+                            <div className="w-full h-1 bg-muted" />
+                          </div>
+                          
+                          {characters
+                            .filter(c => c.character && c.timestamp)
+                            .map((char) => {
+                              const seconds = convertToSeconds(char.timestamp)
+                              const maxDuration = Math.max(
+                                240,
+                                ...characters
+                                  .filter(c => c.timestamp)
+                                  .map(c => convertToSeconds(c.timestamp))
+                              )
+                              const position = (seconds / maxDuration) * 100
+                              
+                              const colors = [
+                                'bg-blue-500',
+                                'bg-purple-500',
+                                'bg-green-500',
+                                'bg-orange-500',
+                                'bg-pink-500',
+                                'bg-cyan-500',
+                                'bg-yellow-500',
+                                'bg-red-500',
+                              ]
+                              const colorIndex = CHARACTERS.indexOf(char.character) % colors.length
+                              
+                              return (
+                                <motion.div
+                                  key={char.id}
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  exit={{ scale: 0 }}
+                                  className="absolute top-1/2 -translate-y-1/2 group"
+                                  style={{ left: `${position}%` }}
+                                >
+                                  <div className={`w-3 h-3 rounded-full ${colors[colorIndex]} border-2 border-background shadow-lg -translate-x-1/2 cursor-pointer transition-transform hover:scale-150`} />
+                                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    <div className="bg-popover text-popover-foreground px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg border border-border">
+                                      <div className="font-semibold">{char.character}</div>
+                                      <div className="text-muted-foreground">{formatSecondsToMMSS(seconds) || char.timestamp}</div>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )
+                            })}
+                        </div>
+                        
+                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                          <span>0:00</span>
+                          <span>
+                            {formatSecondsToMMSS(
+                              Math.max(
+                                240,
+                                ...characters
+                                  .filter(c => c.timestamp)
+                                  .map(c => convertToSeconds(c.timestamp))
+                              )
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2">
+                        {characters
+                          .filter(c => c.character)
+                          .map((char, index) => {
+                            const colors = [
+                              'bg-blue-500',
+                              'bg-purple-500',
+                              'bg-green-500',
+                              'bg-orange-500',
+                              'bg-pink-500',
+                              'bg-cyan-500',
+                              'bg-yellow-500',
+                              'bg-red-500',
+                            ]
+                            const colorIndex = CHARACTERS.indexOf(char.character) % colors.length
+                            
+                            return (
+                              <div key={char.id} className="flex items-center gap-2 text-xs">
+                                <div className={`w-2 h-2 rounded-full ${colors[colorIndex]}`} />
+                                <span className="text-foreground font-medium">{char.character}</span>
+                                {char.timestamp && (
+                                  <span className="text-muted-foreground">
+                                    @ {formatSecondsToMMSS(convertToSeconds(char.timestamp)) || char.timestamp}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
