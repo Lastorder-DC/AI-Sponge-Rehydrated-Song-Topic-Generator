@@ -961,6 +961,16 @@ function App() {
               RiskiVR
             </a>
           </p>
+          <p className="text-xs mt-1">
+            <a
+              href="https://www.mockofun.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              Thumbnail Image Design created with MockoFUN
+            </a>
+          </p>
         </motion.footer>
       </div>
     </div>
