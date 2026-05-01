@@ -306,7 +306,7 @@ function App() {
         <Alert className="mb-6 border-accent/30 bg-accent/5">
           <Warning weight="fill" className="h-5 w-5 text-accent" />
           <AlertDescription className="text-sm">
-            <strong>Remember:</strong> AI Covers/Official Audio Only • Voice Acting Policy • No Regular Songs • Remove ?si= from URLs • Keep songs under 4 mins • Add timestamps for multiple characters
+            <strong>Remember:</strong> AI Covers/Official Audio Only • No Regular Songs • Remove ?si= from URLs • Keep songs under 4 mins • Add timestamps for multiple characters • Check Rules for details
           </AlertDescription>
         </Alert>
 
@@ -537,28 +537,32 @@ function App() {
           >
             <Card className="bg-secondary/10 border-secondary/30">
               <CardHeader>
-                <CardTitle className="text-lg">📝 Formatting Tips</CardTitle>
+                <CardTitle className="text-lg">📝 Song Topic Rules</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex gap-2">
                   <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p><strong>AI Covers/Official Audio Only:</strong> Your song topic MUST be an AI cover, or official audio (Sweet Victory, Ripped Pants) that a character sings in the show or movie.</p>
+                  <p><strong>AI Covers/Official Audio Only:</strong> Your song topic MUST be an AI cover, or official audio (Sweet Victory, Ripped Pants) that a character sings in the show or movie. Voice acted audio is allowed as long as it is from a voice actor or a similar sounding voice. Song topics are NOT AI generated, therefore submitting regular songs will not work!</p>
                 </div>
                 <div className="flex gap-2">
                   <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p><strong>Voice Acting Policy:</strong> Voice acted audio is allowed as long as it is from a voice actor or a similar sounding voice.</p>
+                  <p><strong>US Availability Required:</strong> Do not suggest videos which cannot be viewed on YouTube in the United States, as this will result in the stream breaking. You can check if a video is blocked in the US <a href="https://polsy.org.uk/stuff/ytrestrict.cgi" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">here</a>.</p>
                 </div>
                 <div className="flex gap-2">
                   <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p><strong>No Regular Songs:</strong> Song topics are NOT AI generated, therefore submitting regular songs will not work!</p>
+                  <p><strong>Non-Music Suggestions:</strong> For non-music suggestions, please keep them under 2 minutes, unless you've gotten explicit permission from server staff to post something longer.</p>
                 </div>
                 <div className="flex gap-2">
                   <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p><strong>Multiple Characters:</strong> Add seconds to the starting point of each character</p>
+                  <p><strong>Banned Songs List:</strong> Please refer to the <a href="https://docs.google.com/document/d/1vFOASAIL35UE5ilT4Ec2Tk0G3WpiNC631CFeSmSADJI/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">pinned messages</a> for a list of songs that are not permitted.</p>
                 </div>
                 <div className="flex gap-2">
                   <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p><strong>Example:</strong> !topic plankton 3 spongebob 60 plankton 85 sings https://youtu.be/...</p>
+                  <p><strong>Quality Check:</strong> When submitting your song topic, please do a quality check and do not submit anything that is extremely low quality and/or designed to be loud noise spam.</p>
+                </div>
+                <div className="flex gap-2">
+                  <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <p><strong>Multiple Characters:</strong> Add seconds to the starting point of each character (e.g., !topic plankton 3 spongebob 60 plankton 85 sings https://youtu.be/...)</p>
                 </div>
                 <div className="flex gap-2">
                   <CheckCircle weight="fill" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
