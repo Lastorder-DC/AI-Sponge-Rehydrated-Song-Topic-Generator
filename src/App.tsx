@@ -256,10 +256,14 @@ function App() {
     const cleanedUrl = cleanYoutubeUrl(youtubeUrl)
     if (!cleanedUrl || characters.length === 0) return ''
 
-    const characterParts = characters
-      .filter((char) => char.character)
+    const validCharacters = characters.filter((char) => char.character)
+    
+    const characterParts = validCharacters
       .map((char) => {
         const seconds = convertToSeconds(char.timestamp)
+        if (validCharacters.length > 1) {
+          return `${char.character} ${Math.floor(seconds)}`
+        }
         if (seconds && seconds !== 0) {
           return `${char.character} ${Math.floor(seconds)}`
         }
@@ -459,10 +463,12 @@ function App() {
                 </CardHeader>
                 <CardContent>
                   <div className="aspect-video w-full rounded-md overflow-hidden border border-border">
-                    <img
-                      src={videoInfo.thumbnailUrl}
-                      alt={videoInfo.title}
-                      className="w-full h-full object-cover"
+                    <iframe
+                      src={`https://www.youtube.com/embed/${extractVideoId(youtubeUrl)}`}
+                      title={videoInfo.title}
+                      className="w-full h-full"
+                      allowFullScreen
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     />
                   </div>
                 </CardContent>
