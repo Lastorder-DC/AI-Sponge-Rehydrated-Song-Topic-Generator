@@ -18,4 +18,9 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
+  css: {
+    lightningcss: {
+      errorRecovery: true,
+    },
+  },
 });
