@@ -68,6 +68,14 @@ const getCharacterColor = (character: string): string => {
   return CHARACTER_COLORS[colorIndex]
 }
 
+const createCharacterId = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 function App() {
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [characters, setCharacters] = useState<CharacterEntry[]>([])
@@ -76,6 +84,9 @@ function App() {
   const [commandType, setCommandType] = useState<'topic' | 'supertopic'>('topic')
   const [showShortcutsModal, setShowShortcutsModal] = useState(false)
   const [draggedCharacterId, setDraggedCharacterId] = useState<string | null>(null)
+  const [editingTimestampCharacterId, setEditingTimestampCharacterId] = useState<string | null>(null)
+  const [editingTimestampValue, setEditingTimestampValue] = useState('')
+  const [editingTimestampError, setEditingTimestampError] = useState('')
 
   const extractVideoId = useCallback((url: string): string | null => {
     if (!url) return null
@@ -235,11 +246,16 @@ function App() {
 
   const cleanedYoutubeUrl = useMemo(() => cleanYoutubeUrl(youtubeUrl), [cleanYoutubeUrl, youtubeUrl])
 
+  const editingTimestampCharacter = useMemo(
+    () => characters.find((char) => char.id === editingTimestampCharacterId),
+    [characters, editingTimestampCharacterId],
+  )
+
   const addCharacter = useCallback(() => {
     setCharacters((currentCharacters) => [
       ...currentCharacters,
       {
-        id: crypto.randomUUID(),
+        id: createCharacterId(),
         character: '',
         timestamp: '',
       },
@@ -276,19 +292,37 @@ function App() {
     })
   }, [])
 
-  const editCharacterTimestamp = useCallback((char: CharacterEntry) => {
-    const nextTimestamp = window.prompt(`Edit start time for ${char.character}`, char.timestamp)
-    if (nextTimestamp === null) return
+  const openTimestampEditor = useCallback((char: CharacterEntry) => {
+    setEditingTimestampCharacterId(char.id)
+    setEditingTimestampValue(char.timestamp)
+    setEditingTimestampError('')
+  }, [])
 
-    const trimmedTimestamp = nextTimestamp.trim()
+  const closeTimestampEditor = useCallback(() => {
+    setEditingTimestampCharacterId(null)
+    setEditingTimestampValue('')
+    setEditingTimestampError('')
+  }, [])
+
+  const saveTimestampEdit = useCallback(() => {
+    if (!editingTimestampCharacterId) return
+
+    const trimmedTimestamp = editingTimestampValue.trim()
     const validation = validateTimestamp(trimmedTimestamp)
     if (!validation.valid) {
-      toast.error(validation.error || 'Invalid timestamp')
+      setEditingTimestampError(validation.error || 'Invalid timestamp')
       return
     }
 
-    updateCharacter(char.id, 'timestamp', trimmedTimestamp)
-  }, [updateCharacter, validateTimestamp])
+    updateCharacter(editingTimestampCharacterId, 'timestamp', trimmedTimestamp)
+    closeTimestampEditor()
+  }, [
+    closeTimestampEditor,
+    editingTimestampCharacterId,
+    editingTimestampValue,
+    updateCharacter,
+    validateTimestamp,
+  ])
 
   const generateCommand = useCallback((): string => {
     const cleanedUrl = cleanYoutubeUrl(youtubeUrl)
@@ -394,6 +428,58 @@ function App() {
               <Badge variant="outline" className="font-mono">Ctrl + N</Badge>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(editingTimestampCharacterId)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            closeTimestampEditor()
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Timestamp</DialogTitle>
+            <DialogDescription>
+              Update the start time for {editingTimestampCharacter?.character || 'this character'}.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              saveTimestampEdit()
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="timeline-timestamp">Start Time (mm:ss or seconds)</Label>
+              <Input
+                id="timeline-timestamp"
+                value={editingTimestampValue}
+                onChange={(event) => {
+                  setEditingTimestampValue(event.target.value)
+                  setEditingTimestampError('')
+                }}
+                placeholder="e.g., 1:30"
+                aria-invalid={Boolean(editingTimestampError)}
+                aria-describedby={editingTimestampError ? 'timeline-timestamp-error' : undefined}
+              />
+              {editingTimestampError && (
+                <p id="timeline-timestamp-error" className="text-sm text-destructive">
+                  {editingTimestampError}
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={closeTimestampEditor}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Save
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -538,6 +624,9 @@ function App() {
                         <Label className="text-sm font-semibold">Character Timeline</Label>
                         <span className="text-xs text-muted-foreground">Visual preview of when each character appears</span>
                       </div>
+                      <p id="timeline-drag-instructions" className="sr-only">
+                        Timeline markers can be clicked to edit timestamps and dragged onto another marker to reorder characters.
+                      </p>
                       <div className="relative bg-muted/30 rounded-lg p-4 border border-border">
                         <div className="relative h-16 bg-background/50 rounded border border-border overflow-hidden">
                           <div className="absolute inset-0 flex items-center">
@@ -573,8 +662,9 @@ function App() {
                                   <button
                                     type="button"
                                     aria-label={`Edit ${char.character} timestamp`}
+                                    aria-describedby="timeline-drag-instructions"
                                     title="Click to edit timestamp. Drag onto another marker to reorder."
-                                    onClick={() => editCharacterTimestamp(char)}
+                                    onClick={() => openTimestampEditor(char)}
                                     className={`w-4 h-4 rounded-full ${color} border-2 border-background shadow-lg -translate-x-1/2 cursor-grab active:cursor-grabbing transition-transform hover:scale-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background`}
                                   />
                                   <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
