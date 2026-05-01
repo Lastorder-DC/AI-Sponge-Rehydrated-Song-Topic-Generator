@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { Plus, Copy, Trash, Link, MusicNote, CheckCircle, Warning, Clock, Keyboard } from '@phosphor-icons/react'
+import { useState, useEffect } from 'react'
+import { Plus, Copy, Trash, Link, MusicNote, CheckCircle, Warning, Keyboard } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -59,7 +59,6 @@ function App() {
   const [isLoadingVideo, setIsLoadingVideo] = useState(false)
   const [commandType, setCommandType] = useState<'topic' | 'supertopic'>('topic')
   const [showShortcutsModal, setShowShortcutsModal] = useState(false)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
@@ -82,37 +81,6 @@ function App() {
     window.addEventListener('keydown', handleKeyboard)
     return () => window.removeEventListener('keydown', handleKeyboard)
   }, [youtubeUrl, characters, commandType])
-
-  useEffect(() => {
-    if (!videoInfo || !extractVideoId(youtubeUrl)) return
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== 'https://www.youtube.com') return
-      
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
-        
-        if (data.event === 'infoDelivery' && data.info?.duration) {
-          setVideoInfo(prev => prev ? {
-            ...prev,
-            durationSeconds: Math.floor(data.info.duration)
-          } : null)
-        }
-      } catch (e) {
-      }
-    }
-
-    window.addEventListener('message', handleMessage)
-    
-    if (iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage(
-        '{"event":"command","func":"getVideoData","args":""}',
-        '*'
-      )
-    }
-
-    return () => window.removeEventListener('message', handleMessage)
-  }, [videoInfo?.title, youtubeUrl])
 
   const extractVideoId = (url: string): string | null => {
     if (!url) return null
@@ -282,58 +250,6 @@ function App() {
 
   const removeCharacter = (id: string) => {
     setCharacters(characters.filter((char) => char.id !== id))
-  }
-
-  const setCurrentVideoTime = (id: string) => {
-    if (!iframeRef.current?.contentWindow) {
-      toast.error('Video player not found', {
-        description: 'Please ensure a valid YouTube URL is entered'
-      })
-      return
-    }
-
-    let timeoutId: number | null = null
-    let messageHandler: ((event: MessageEvent) => void) | null = null
-
-    messageHandler = (event: MessageEvent) => {
-      if (event.origin !== 'https://www.youtube.com') return
-      
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
-        
-        if (data.event === 'infoDelivery' && data.info && typeof data.info.currentTime === 'number') {
-          if (timeoutId) clearTimeout(timeoutId)
-          const currentTime = Math.floor(data.info.currentTime)
-          const formattedTime = formatSecondsToMMSS(currentTime)
-          updateCharacter(id, 'timestamp', formattedTime)
-          toast.success('Timestamp set!', {
-            description: `Set to ${formattedTime}`
-          })
-          if (messageHandler) window.removeEventListener('message', messageHandler)
-        }
-      } catch (e) {
-        if (timeoutId) clearTimeout(timeoutId)
-        if (messageHandler) window.removeEventListener('message', messageHandler)
-      }
-    }
-
-    window.addEventListener('message', messageHandler)
-    
-    timeoutId = window.setTimeout(() => {
-      if (messageHandler) window.removeEventListener('message', messageHandler)
-      toast.error('Failed to get video time', {
-        description: 'Please try again or enter manually'
-      })
-    }, 3000)
-    
-    iframeRef.current.contentWindow.postMessage(
-      JSON.stringify({
-        event: 'command',
-        func: 'getCurrentTime',
-        args: ''
-      }),
-      '*'
-    )
   }
 
   const generateCommand = (): string => {
@@ -537,24 +453,18 @@ function App() {
               <Card className="border-primary/20">
                 <CardHeader>
                   <CardTitle className="text-base">Video Preview</CardTitle>
-                  {videoInfo.durationSeconds && (
-                    <CardDescription>
-                      Duration: {Math.floor(videoInfo.durationSeconds / 60)}:{(videoInfo.durationSeconds % 60).toString().padStart(2, '0')} ({videoInfo.durationSeconds}s)
-                    </CardDescription>
-                  )}
+                  <CardDescription>
+                    <p className="font-medium text-sm line-clamp-2">{videoInfo.title}</p>
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="aspect-video w-full rounded-md overflow-hidden border border-border">
-                    <iframe
-                      ref={iframeRef}
-                      className="w-full h-full"
-                      src={`https://www.youtube.com/embed/${extractVideoId(youtubeUrl)}?enablejsapi=1`}
-                      title={videoInfo.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
+                    <img
+                      src={videoInfo.thumbnailUrl}
+                      alt={videoInfo.title}
+                      className="w-full h-full object-cover"
                     />
                   </div>
-                  <p className="font-medium text-sm mt-3 line-clamp-2">{videoInfo.title}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -607,10 +517,10 @@ function App() {
                             transition={{ duration: 0.2 }}
                             className="flex gap-3 items-start"
                           >
-                            <Badge variant="outline" className="mt-8 min-w-8 justify-center">
+                            <Badge variant="outline" className="mt-2 min-w-8 justify-center">
                               {index + 1}
                             </Badge>
-                            <div className="flex-1 space-y-3">
+                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                               <div>
                                 <Label htmlFor={`character-${char.id}`} className="text-xs mb-1.5 block">
                                   Character
@@ -635,37 +545,24 @@ function App() {
                                 <Label htmlFor={`timestamp-${char.id}`} className="text-xs mb-1.5 block">
                                   Start Time (mm:ss)
                                 </Label>
-                                <div className="flex gap-2">
-                                  <div className="flex-1">
-                                    <Input
-                                      id={`timestamp-${char.id}`}
-                                      type="text"
-                                      placeholder={index === 0 ? '0:00 (optional)' : 'e.g., 1:30'}
-                                      value={char.timestamp}
-                                      onChange={(e) => updateCharacter(char.id, 'timestamp', e.target.value)}
-                                      className={!timestampValidation.valid ? 'border-destructive' : ''}
-                                    />
-                                    {!timestampValidation.valid && (
-                                      <p className="text-xs text-destructive mt-1">{timestampValidation.error}</p>
-                                    )}
-                                  </div>
-                                  <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => setCurrentVideoTime(char.id)}
-                                    title="Get current video time"
-                                    type="button"
-                                  >
-                                    <Clock weight="bold" />
-                                  </Button>
-                                </div>
+                                <Input
+                                  id={`timestamp-${char.id}`}
+                                  type="text"
+                                  placeholder={index === 0 ? '0:00 (optional)' : 'e.g., 1:30'}
+                                  value={char.timestamp}
+                                  onChange={(e) => updateCharacter(char.id, 'timestamp', e.target.value)}
+                                  className={!timestampValidation.valid ? 'border-destructive' : ''}
+                                />
+                                {!timestampValidation.valid && (
+                                  <p className="text-xs text-destructive mt-1">{timestampValidation.error}</p>
+                                )}
                               </div>
                             </div>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => removeCharacter(char.id)}
-                              className="mt-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              className="mt-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
                               <Trash weight="bold" />
                             </Button>
