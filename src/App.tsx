@@ -56,7 +56,7 @@ function App() {
   const [characters, setCharacters] = useState<CharacterEntry[]>([])
   const [urlError, setUrlError] = useState('')
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null)
-  const [isLoadingVideo, setIsLoadingVideo] = useState(false)
+  const [, setIsLoadingVideo] = useState(false)
   const [commandType, setCommandType] = useState<'topic' | 'supertopic'>('topic')
   const [showShortcutsModal, setShowShortcutsModal] = useState(false)
 
@@ -86,9 +86,9 @@ function App() {
     if (!url) return null
     
     const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?\/\s]+)/,
-      /youtube\.com\/embed\/([^&?\/\s]+)/,
-      /youtube\.com\/v\/([^&?\/\s]+)/
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?\s]+)/,
+      /youtube\.com\/embed\/([^&?\s]+)/,
+      /youtube\.com\/v\/([^&?\s]+)/
     ]
     
     for (const pattern of patterns) {
@@ -155,7 +155,7 @@ function App() {
           durationSeconds: undefined
         })
       }
-    } catch (error) {
+    } catch {
       setVideoInfo({
         thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
         duration: '',
@@ -301,7 +301,7 @@ function App() {
       toast.success('Command copied to clipboard!', {
         description: 'Ready to paste in Discord',
       })
-    } catch (err) {
+    } catch {
       toast.error('Failed to copy to clipboard')
     }
   }
@@ -547,7 +547,7 @@ function App() {
                       <div className="flex flex-wrap gap-2">
                         {characters
                           .filter(c => c.character)
-                          .map((char, index) => {
+                          .map((char) => {
                             const colors = [
                               'bg-blue-500',
                               'bg-purple-500',
