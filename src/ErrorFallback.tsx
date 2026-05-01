@@ -1,5 +1,5 @@
 import { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
-import { Button } from "./components/ui/button";
+import { AlertTriangleIcon, RefreshCwIcon } from
 import { AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
 
 export const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => {
@@ -7,15 +7,15 @@ export const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; res
     throw error;
   }
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-6">
-        <Alert variant="destructive">
-          <AlertTriangleIcon className="h-4 w-4" />
-          <AlertTitle>This spark has encountered a runtime error</AlertTitle>
-          <AlertDescription>
-            Something unexpected happened while running the application. The error details are shown below. Contact the spark author and let them know about this issue.
-          </AlertDescription>
+        </
+        <div className="bg-card border rounded-lg p-4 mb-6">
+          <pre className="text-xs text-destructiv
+          </pre>
+        
+          onClick={resetErrorBoundary} 
+        >
+          Try Again
+      </div>
         </Alert>
         
         <div className="bg-card border rounded-lg p-4 mb-6">
@@ -34,5 +34,5 @@ export const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; res
         </Button>
       </div>
     </div>
-  );
-};
+
+
