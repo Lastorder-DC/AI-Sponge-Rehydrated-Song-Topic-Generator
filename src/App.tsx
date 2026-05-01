@@ -82,6 +82,7 @@ function App() {
   const [urlError, setUrlError] = useState('')
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null)
   const [commandType, setCommandType] = useState<'topic' | 'supertopic'>('topic')
+  const [stage, setStage] = useState<number | null>(null)
   const [showShortcutsModal, setShowShortcutsModal] = useState(false)
   const [draggedCharacterId, setDraggedCharacterId] = useState<string | null>(null)
   const [editingTimestampCharacterId, setEditingTimestampCharacterId] = useState<string | null>(null)
@@ -345,8 +346,9 @@ function App() {
 
     if (!characterParts) return ''
 
-    return `!${commandType} ${characterParts} sings ${cleanedUrl}`
-  }, [characters, cleanYoutubeUrl, commandType, convertToSeconds, youtubeUrl])
+    const stagePart = stage !== null ? `stage=${stage} ` : ''
+    return `!${commandType} ${stagePart}${characterParts} sings ${cleanedUrl}`
+  }, [characters, cleanYoutubeUrl, commandType, convertToSeconds, stage, youtubeUrl])
 
   const command = useMemo(() => generateCommand(), [generateCommand])
 
@@ -588,6 +590,47 @@ function App() {
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="supertopic" id="supertopic" />
                     <Label htmlFor="supertopic" className="font-normal cursor-pointer">!supertopic</Label>
+                  </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.14 }}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MusicNote weight="bold" className="text-primary" />
+                  Stage
+                </CardTitle>
+                <CardDescription>
+                  Optionally specify the stage location for the song topic
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup
+                  value={stage !== null ? String(stage) : 'none'}
+                  onValueChange={(value) => setStage(value === 'none' ? null : Number(value))}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="none" id="stage-none" />
+                    <Label htmlFor="stage-none" className="font-normal cursor-pointer">None (default)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="0" id="stage-0" />
+                    <Label htmlFor="stage-0" className="font-normal cursor-pointer">Stage 0 — Krusty Krab</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="1" id="stage-1" />
+                    <Label htmlFor="stage-1" className="font-normal cursor-pointer">Stage 1 — Goofy Goober's</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="2" id="stage-2" />
+                    <Label htmlFor="stage-2" className="font-normal cursor-pointer">Stage 2 — Glove World</Label>
                   </div>
                 </RadioGroup>
               </CardContent>
