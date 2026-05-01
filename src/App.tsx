@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Copy, Trash, Link, MusicNote, CheckCircle, Warning } from '@phosphor-icons/react'
+import { useState, useEffect } from 'react'
+import { Plus, Copy, Trash, Link, MusicNote, CheckCircle, Warning, Clock } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,10 +41,36 @@ interface CharacterEntry {
   timestamp: string
 }
 
+interface VideoInfo {
+  thumbnailUrl: string
+  duration: string
+  title: string
+}
+
 function App() {
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [characters, setCharacters] = useState<CharacterEntry[]>([])
   const [urlError, setUrlError] = useState('')
+  const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null)
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false)
+
+  const extractVideoId = (url: string): string | null => {
+    if (!url) return null
+    
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?\/\s]+)/,
+      /youtube\.com\/embed\/([^&?\/\s]+)/,
+      /youtube\.com\/v\/([^&?\/\s]+)/
+    ]
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern)
+      if (match && match[1]) {
+        return match[1]
+      }
+    }
+    return null
+  }
 
   const cleanYoutubeUrl = (url: string): string => {
     if (!url) return ''
@@ -60,6 +86,12 @@ function App() {
       setUrlError('')
       return false
     }
+    
+    if (url.includes('/live/')) {
+      setUrlError('Live streams are not supported')
+      return false
+    }
+    
     const isValid = url.includes('youtu.be/') || url.includes('youtube.com/')
     if (!isValid) {
       setUrlError('Please enter a valid YouTube URL')
@@ -69,9 +101,71 @@ function App() {
     return isValid
   }
 
+  const fetchVideoInfo = async (url: string) => {
+    const videoId = extractVideoId(url)
+    if (!videoId) return
+
+    setIsLoadingVideo(true)
+    try {
+      const response = await fetch(
+        `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+      )
+      
+      if (response.ok) {
+        const data = await response.json()
+        setVideoInfo({
+          thumbnailUrl: data.thumbnail_url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+          duration: '',
+          title: data.title || 'YouTube Video'
+        })
+      } else {
+        setVideoInfo({
+          thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+          duration: '',
+          title: 'YouTube Video'
+        })
+      }
+    } catch (error) {
+      setVideoInfo({
+        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        duration: '',
+        title: 'YouTube Video'
+      })
+    } finally {
+      setIsLoadingVideo(false)
+    }
+  }
+
   const handleUrlChange = (value: string) => {
     setYoutubeUrl(value)
-    validateYoutubeUrl(value)
+    const isValid = validateYoutubeUrl(value)
+    
+    if (isValid) {
+      fetchVideoInfo(value)
+    } else {
+      setVideoInfo(null)
+    }
+  }
+
+  const convertToSeconds = (timeStr: string): number => {
+    if (!timeStr) return 0
+    
+    const parts = timeStr.split(':')
+    if (parts.length === 1) {
+      return parseFloat(parts[0]) || 0
+    } else if (parts.length === 2) {
+      const minutes = parseInt(parts[0]) || 0
+      const seconds = parseFloat(parts[1]) || 0
+      return minutes * 60 + seconds
+    }
+    return 0
+  }
+
+  const formatSecondsToMMSS = (seconds: number): string => {
+    if (!seconds || seconds === 0) return ''
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   const addCharacter = () => {
@@ -97,6 +191,12 @@ function App() {
     setCharacters(characters.filter((char) => char.id !== id))
   }
 
+  const setCurrentVideoTime = (id: string) => {
+    toast.info('This feature requires YouTube iframe integration', {
+      description: 'For now, please enter the time manually in mm:ss format'
+    })
+  }
+
   const generateCommand = (): string => {
     const cleanedUrl = cleanYoutubeUrl(youtubeUrl)
     if (!cleanedUrl || characters.length === 0) return ''
@@ -104,8 +204,9 @@ function App() {
     const characterParts = characters
       .filter((char) => char.character)
       .map((char) => {
-        if (char.timestamp && char.timestamp !== '0') {
-          return `${char.character} ${char.timestamp}`
+        const seconds = convertToSeconds(char.timestamp)
+        if (seconds && seconds !== 0) {
+          return `${char.character} ${Math.floor(seconds)}`
         }
         return char.character
       })
@@ -125,8 +226,8 @@ function App() {
 
     for (const char of characters) {
       if (char.timestamp && char.timestamp !== '') {
-        const num = parseFloat(char.timestamp)
-        if (isNaN(num) || num < 0) return false
+        const seconds = convertToSeconds(char.timestamp)
+        if (seconds < 0) return false
       }
     }
 
@@ -161,7 +262,7 @@ function App() {
           <div className="flex items-center justify-center gap-3 mb-3">
             <MusicNote weight="fill" className="text-accent w-10 h-10" />
             <h1 className="text-4xl font-bold tracking-tight text-foreground">
-              AI Sponge Song Topic Generator
+              AI Sponge Rehydrated Song Topic Generator
             </h1>
           </div>
           <p className="text-muted-foreground text-lg">
@@ -172,7 +273,7 @@ function App() {
         <Alert className="mb-6 border-accent/30 bg-accent/5">
           <Warning weight="fill" className="h-5 w-5 text-accent" />
           <AlertDescription className="text-sm">
-            <strong>Remember:</strong> Remove ?si= from URLs • Keep songs under 4 mins • Add timestamps for multiple characters
+            <strong>Remember:</strong> Live streams not supported • Remove ?si= from URLs • Keep songs under 4 mins • Add timestamps for multiple characters
           </AlertDescription>
         </Alert>
 
@@ -218,6 +319,38 @@ function App() {
               </CardContent>
             </Card>
           </motion.div>
+
+          {videoInfo && !urlError && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+            >
+              <Card className="border-primary/20">
+                <CardHeader>
+                  <CardTitle className="text-base">Video Preview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-4 items-start">
+                    <img 
+                      src={videoInfo.thumbnailUrl} 
+                      alt="Video thumbnail" 
+                      className="w-32 h-24 object-cover rounded-md border border-border"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm line-clamp-2 mb-1">{videoInfo.title}</p>
+                      {videoInfo.duration && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Clock weight="fill" className="w-3 h-3 mr-1" />
+                          {videoInfo.duration}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -290,16 +423,27 @@ function App() {
                             </div>
                             <div>
                               <Label htmlFor={`timestamp-${char.id}`} className="text-xs mb-1.5 block">
-                                Start Time (seconds)
+                                Start Time (mm:ss)
                               </Label>
-                              <Input
-                                id={`timestamp-${char.id}`}
-                                type="number"
-                                min="0"
-                                placeholder={index === 0 ? '0 (optional)' : 'e.g., 60'}
-                                value={char.timestamp}
-                                onChange={(e) => updateCharacter(char.id, 'timestamp', e.target.value)}
-                              />
+                              <div className="flex gap-2">
+                                <Input
+                                  id={`timestamp-${char.id}`}
+                                  type="text"
+                                  placeholder={index === 0 ? '0:00 (optional)' : 'e.g., 1:30'}
+                                  value={char.timestamp}
+                                  onChange={(e) => updateCharacter(char.id, 'timestamp', e.target.value)}
+                                  className="flex-1"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => setCurrentVideoTime(char.id)}
+                                  title="Get current video time"
+                                  type="button"
+                                >
+                                  <Clock weight="bold" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
                           <Button
@@ -388,6 +532,46 @@ function App() {
             </Card>
           </motion.div>
         </div>
+
+        <motion.footer
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-12 pb-8 text-center text-sm text-muted-foreground"
+        >
+          <Separator className="mb-6" />
+          <p className="mb-2">
+            © {new Date().getFullYear()}{' '}
+            <a 
+              href="https://aisponge.net/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="font-medium text-foreground hover:text-primary transition-colors"
+            >
+              AI Sponge Rehydrated
+            </a>
+          </p>
+          <p className="text-xs">
+            Created by{' '}
+            <a 
+              href="https://dzth.bio.link/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              Deezaath
+            </a>
+            {' & '}
+            <a 
+              href="https://riskivr.com/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              RiskiVR
+            </a>
+          </p>
+        </motion.footer>
       </div>
     </div>
   )
