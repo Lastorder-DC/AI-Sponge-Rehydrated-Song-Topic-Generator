@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Plus, Copy, Trash, Link, MusicNote, CheckCircle, Warning, Clock } from '@phosphor-icons/react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Copy, Trash, Link, MusicNote, CheckCircle, Warning, Clock, Keyboard } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -47,6 +48,7 @@ interface VideoInfo {
   thumbnailUrl: string
   duration: string
   title: string
+  durationSeconds?: number
 }
 
 function App() {
@@ -56,6 +58,61 @@ function App() {
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null)
   const [isLoadingVideo, setIsLoadingVideo] = useState(false)
   const [commandType, setCommandType] = useState<'topic' | 'supertopic'>('topic')
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowShortcutsModal(true)
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.shiftKey) {
+        e.preventDefault()
+        if (isValidCommand()) {
+          copyToClipboard()
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        addCharacter()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyboard)
+    return () => window.removeEventListener('keydown', handleKeyboard)
+  }, [youtubeUrl, characters, commandType])
+
+  useEffect(() => {
+    if (!videoInfo || !extractVideoId(youtubeUrl)) return
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.youtube.com') return
+      
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
+        
+        if (data.event === 'infoDelivery' && data.info?.duration) {
+          setVideoInfo(prev => prev ? {
+            ...prev,
+            durationSeconds: Math.floor(data.info.duration)
+          } : null)
+        }
+      } catch (e) {
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        '{"event":"command","func":"getVideoData","args":""}',
+        '*'
+      )
+    }
+
+    return () => window.removeEventListener('message', handleMessage)
+  }, [videoInfo?.title, youtubeUrl])
 
   const extractVideoId = (url: string): string | null => {
     if (!url) return null
@@ -119,20 +176,23 @@ function App() {
         setVideoInfo({
           thumbnailUrl: data.thumbnail_url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
           duration: '',
-          title: data.title || 'YouTube Video'
+          title: data.title || 'YouTube Video',
+          durationSeconds: undefined
         })
       } else {
         setVideoInfo({
           thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
           duration: '',
-          title: 'YouTube Video'
+          title: 'YouTube Video',
+          durationSeconds: undefined
         })
       }
     } catch (error) {
       setVideoInfo({
         thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
         duration: '',
-        title: 'YouTube Video'
+        title: 'YouTube Video',
+        durationSeconds: undefined
       })
     } finally {
       setIsLoadingVideo(false)
@@ -148,6 +208,36 @@ function App() {
     } else {
       setVideoInfo(null)
     }
+  }
+
+  const validateTimestamp = (timeStr: string): { valid: boolean; error?: string } => {
+    if (!timeStr || timeStr === '') return { valid: true }
+    
+    const parts = timeStr.split(':')
+    
+    if (parts.length > 2) {
+      return { valid: false, error: 'Format should be mm:ss or ss' }
+    }
+    
+    if (parts.length === 1) {
+      const seconds = parseFloat(parts[0])
+      if (isNaN(seconds) || seconds < 0) {
+        return { valid: false, error: 'Must be a positive number' }
+      }
+    } else if (parts.length === 2) {
+      const minutes = parseInt(parts[0])
+      const seconds = parseFloat(parts[1])
+      
+      if (isNaN(minutes) || isNaN(seconds)) {
+        return { valid: false, error: 'Invalid time format' }
+      }
+      
+      if (minutes < 0 || seconds < 0 || seconds >= 60) {
+        return { valid: false, error: 'Invalid time values' }
+      }
+    }
+    
+    return { valid: true }
   }
 
   const convertToSeconds = (timeStr: string): number => {
@@ -195,22 +285,28 @@ function App() {
   }
 
   const setCurrentVideoTime = (id: string) => {
-    const iframe = document.getElementById('youtube-player') as HTMLIFrameElement
-    if (!iframe || !iframe.contentWindow) {
+    if (!iframeRef.current?.contentWindow) {
       toast.error('Video player not found', {
         description: 'Please ensure a valid YouTube URL is entered'
       })
       return
     }
 
-    iframe.contentWindow.postMessage('{"event":"command","func":"getCurrentTime","args":""}', '*')
-    
+    const timeoutId = setTimeout(() => {
+      window.removeEventListener('message', messageHandler)
+      toast.error('Failed to get video time', {
+        description: 'Please try again or enter manually'
+      })
+    }, 3000)
+
     const messageHandler = (event: MessageEvent) => {
       if (event.origin !== 'https://www.youtube.com') return
       
       try {
-        const data = JSON.parse(event.data)
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
+        
         if (data.event === 'infoDelivery' && data.info && typeof data.info.currentTime === 'number') {
+          clearTimeout(timeoutId)
           const currentTime = Math.floor(data.info.currentTime)
           const formattedTime = formatSecondsToMMSS(currentTime)
           updateCharacter(id, 'timestamp', formattedTime)
@@ -220,17 +316,17 @@ function App() {
           window.removeEventListener('message', messageHandler)
         }
       } catch (e) {
-        toast.error('Failed to get video time', {
-          description: 'Please try again or enter manually'
-        })
+        clearTimeout(timeoutId)
+        window.removeEventListener('message', messageHandler)
       }
     }
 
     window.addEventListener('message', messageHandler)
     
-    setTimeout(() => {
-      window.removeEventListener('message', messageHandler)
-    }, 3000)
+    iframeRef.current.contentWindow.postMessage(
+      '{"event":"command","func":"getCurrentTime","args":""}',
+      '*'
+    )
   }
 
   const generateCommand = (): string => {
@@ -262,8 +358,8 @@ function App() {
 
     for (const char of characters) {
       if (char.timestamp && char.timestamp !== '') {
-        const seconds = convertToSeconds(char.timestamp)
-        if (seconds < 0) return false
+        const validation = validateTimestamp(char.timestamp)
+        if (!validation.valid) return false
       }
     }
 
@@ -286,6 +382,34 @@ function App() {
   return (
     <>
       <Toaster />
+      <Dialog open={showShortcutsModal} onOpenChange={setShowShortcutsModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Keyboard weight="bold" className="text-primary" />
+              Keyboard Shortcuts
+            </DialogTitle>
+            <DialogDescription>
+              Use these shortcuts to speed up your workflow
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center py-2 border-b">
+              <span className="text-sm">Show shortcuts</span>
+              <Badge variant="outline" className="font-mono">Ctrl + K</Badge>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b">
+              <span className="text-sm">Copy command</span>
+              <Badge variant="outline" className="font-mono">Ctrl + Shift + C</Badge>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b">
+              <span className="text-sm">Add character</span>
+              <Badge variant="outline" className="font-mono">Ctrl + N</Badge>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/10 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,200,220,0.1),transparent_50%)]" />
         <div className="absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent,transparent_50px,rgba(120,200,220,0.03)_50px,rgba(120,200,220,0.03)_51px)]" />
@@ -303,9 +427,18 @@ function App() {
               AI Sponge Rehydrated<br />Song Topic Generator
             </h1>
           </div>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-lg mb-3">
             Create properly formatted commands for the AI Sponge Rehydrated Discord server
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowShortcutsModal(true)}
+            className="text-xs"
+          >
+            <Keyboard weight="bold" className="mr-2 w-4 h-4" />
+            Keyboard Shortcuts (Ctrl + K)
+          </Button>
         </motion.div>
 
         <Alert className="mb-6 border-accent/30 bg-accent/5">
@@ -397,11 +530,16 @@ function App() {
               <Card className="border-primary/20">
                 <CardHeader>
                   <CardTitle className="text-base">Video Preview</CardTitle>
+                  {videoInfo.durationSeconds && (
+                    <CardDescription>
+                      Duration: {Math.floor(videoInfo.durationSeconds / 60)}:{(videoInfo.durationSeconds % 60).toString().padStart(2, '0')} ({videoInfo.durationSeconds}s)
+                    </CardDescription>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="aspect-video w-full rounded-md overflow-hidden border border-border">
                     <iframe
-                      id="youtube-player"
+                      ref={iframeRef}
                       className="w-full h-full"
                       src={`https://www.youtube.com/embed/${extractVideoId(youtubeUrl)}?enablejsapi=1`}
                       title={videoInfo.title}
@@ -429,7 +567,7 @@ function App() {
                       Characters
                     </CardTitle>
                     <CardDescription>
-                      Add characters and their start times (in seconds)
+                      Add characters and their start times (mm:ss or seconds)
                     </CardDescription>
                   </div>
                   <Button
@@ -451,74 +589,82 @@ function App() {
                 ) : (
                   <div className="space-y-3">
                     <AnimatePresence mode="popLayout">
-                      {characters.map((char, index) => (
-                        <motion.div
-                          key={char.id}
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -20 }}
-                          transition={{ duration: 0.2 }}
-                          className="flex gap-3 items-start"
-                        >
-                          <Badge variant="outline" className="mt-2.5 min-w-8 justify-center">
-                            {index + 1}
-                          </Badge>
-                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <Label htmlFor={`character-${char.id}`} className="text-xs mb-1.5 block">
-                                Character
-                              </Label>
-                              <Select
-                                value={char.character}
-                                onValueChange={(value) => updateCharacter(char.id, 'character', value)}
-                              >
-                                <SelectTrigger id={`character-${char.id}`}>
-                                  <SelectValue placeholder="Select character" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {CHARACTERS.map((character) => (
-                                    <SelectItem key={character} value={character}>
-                                      {character}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label htmlFor={`timestamp-${char.id}`} className="text-xs mb-1.5 block">
-                                Start Time (mm:ss)
-                              </Label>
-                              <div className="flex gap-2">
-                                <Input
-                                  id={`timestamp-${char.id}`}
-                                  type="text"
-                                  placeholder={index === 0 ? '0:00 (optional)' : 'e.g., 1:30'}
-                                  value={char.timestamp}
-                                  onChange={(e) => updateCharacter(char.id, 'timestamp', e.target.value)}
-                                  className="flex-1"
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => setCurrentVideoTime(char.id)}
-                                  title="Get current video time"
-                                  type="button"
+                      {characters.map((char, index) => {
+                        const timestampValidation = validateTimestamp(char.timestamp)
+                        return (
+                          <motion.div
+                            key={char.id}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex gap-3 items-start"
+                          >
+                            <Badge variant="outline" className="mt-2.5 min-w-8 justify-center">
+                              {index + 1}
+                            </Badge>
+                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <Label htmlFor={`character-${char.id}`} className="text-xs mb-1.5 block">
+                                  Character
+                                </Label>
+                                <Select
+                                  value={char.character}
+                                  onValueChange={(value) => updateCharacter(char.id, 'character', value)}
                                 >
-                                  <Clock weight="bold" />
-                                </Button>
+                                  <SelectTrigger id={`character-${char.id}`}>
+                                    <SelectValue placeholder="Select character" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {CHARACTERS.map((character) => (
+                                      <SelectItem key={character} value={character}>
+                                        {character}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label htmlFor={`timestamp-${char.id}`} className="text-xs mb-1.5 block">
+                                  Start Time (mm:ss)
+                                </Label>
+                                <div className="flex gap-2">
+                                  <div className="flex-1">
+                                    <Input
+                                      id={`timestamp-${char.id}`}
+                                      type="text"
+                                      placeholder={index === 0 ? '0:00 (optional)' : 'e.g., 1:30'}
+                                      value={char.timestamp}
+                                      onChange={(e) => updateCharacter(char.id, 'timestamp', e.target.value)}
+                                      className={!timestampValidation.valid ? 'border-destructive' : ''}
+                                    />
+                                    {!timestampValidation.valid && (
+                                      <p className="text-xs text-destructive mt-1">{timestampValidation.error}</p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => setCurrentVideoTime(char.id)}
+                                    title="Get current video time"
+                                    type="button"
+                                  >
+                                    <Clock weight="bold" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeCharacter(char.id)}
-                            className="mt-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash weight="bold" />
-                          </Button>
-                        </motion.div>
-                      ))}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeCharacter(char.id)}
+                              className="mt-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash weight="bold" />
+                            </Button>
+                          </motion.div>
+                        )
+                      })}
                     </AnimatePresence>
                   </div>
                 )}
