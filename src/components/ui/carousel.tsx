@@ -4,8 +4,8 @@ import { ComponentProps, createContext, useCallback, useContext, useEffect, useS
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
 } from "embla-carousel-react"
-import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left"
-import ArrowRight from "lucide-react/dist/esm/icons/arrow-right"
+import { ArrowLeftIcon as ArrowLeft } from "lucide-react"
+import { ArrowRightIcon as ArrowRight } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -59,13 +59,13 @@ function Carousel({
     },
     plugins
   )
-  const [canScrollPrev, setCanScrollPrev] = useState(false)
-  const [canScrollNext, setCanScrollNext] = useState(false)
+  // Bumped on embla events so canScrollPrev/canScrollNext are re-read from the api.
+  const [, setScrollVersion] = useState(0)
+  const canScrollPrev = api?.canScrollPrev() ?? false
+  const canScrollNext = api?.canScrollNext() ?? false
 
-  const onSelect = useCallback((api: CarouselApi) => {
-    if (!api) return
-    setCanScrollPrev(api.canScrollPrev())
-    setCanScrollNext(api.canScrollNext())
+  const onSelect = useCallback(() => {
+    setScrollVersion((version) => version + 1)
   }, [])
 
   const scrollPrev = useCallback(() => {
@@ -96,12 +96,12 @@ function Carousel({
 
   useEffect(() => {
     if (!api) return
-    onSelect(api)
     api.on("reInit", onSelect)
     api.on("select", onSelect)
 
     return () => {
-      api?.off("select", onSelect)
+      api.off("reInit", onSelect)
+      api.off("select", onSelect)
     }
   }, [api, onSelect])
 

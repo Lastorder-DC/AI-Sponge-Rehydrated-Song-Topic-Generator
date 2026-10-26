@@ -1,8 +1,9 @@
 import { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
 import { AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "./components/ui/button";
+import type { FallbackProps } from "react-error-boundary";
 
-export const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => {
+export const ErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => {
   if (import.meta.env.DEV) {
     throw error;
   }
@@ -21,7 +22,7 @@ export const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; res
         <div className="bg-card border rounded-lg p-4 mb-6">
           <h3 className="font-semibold text-sm text-muted-foreground mb-2">Error Details:</h3>
           <pre className="text-xs text-destructive bg-muted/50 p-3 rounded border overflow-auto max-h-32">
-            {error.message}
+            {error instanceof Error ? error.message : String(error)}
           </pre>
         </div>
         
